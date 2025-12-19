@@ -8,12 +8,23 @@ BASE_URL = "https://api.rawg.io/api"
 def search_game(name):
     url = f"{BASE_URL}/games"
     params = {
-        "search" : name,
-        "key" : RAWG_API_KEY
+        "search": name,
+        "key": RAWG_API_KEY
     }
     response = requests.get(url, params=params)
     data = response.json()
-    return data["results"][0] if data else None
+
+    if not data["results"]:
+        return None
+
+    game_id = data["results"][0]["id"]
+
+    details_url = f"{BASE_URL}/games/{game_id}"
+    details_params = {"key": RAWG_API_KEY}
+    details_response = requests.get(details_url, params=details_params)
+
+    return details_response.json()
+
 
 def get_top_games():
     url = f"{BASE_URL}/games"
