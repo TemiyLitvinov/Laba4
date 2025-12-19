@@ -5,7 +5,7 @@ from config import RAWG_API_KEY
 BASE_URL = "https://api.rawg.io/api"
 
 
-def search_game(name):
+def search_game(name : str):
     url = f"{BASE_URL}/games"
     params = {
         "search": name,
