@@ -3,6 +3,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from googletrans import Translator
+
 
 from config import BOT_TOKEN
 from api import search_game, get_top_games
@@ -10,6 +12,7 @@ from states import GameSearch
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
+translator = Translator()
 
 
 @dp.message(Command("start"))
@@ -30,6 +33,8 @@ async def game_command(message: types.Message, state: FSMContext):
 async def process_game_name(message: types.Message, state: FSMContext):
     name = message.text
     game = search_game(name)
+    description = game['description_raw']
+    translated_description = translator.translate(description, dest="ru").text
 
     if not game:
         await message.answer("Игра не найдена :(")
@@ -40,7 +45,7 @@ async def process_game_name(message: types.Message, state: FSMContext):
         f"🎮 {game['name']}\n"
         f"⭐ Рейтинг: {game['rating']}\n"
         f"📅 Дата выхода: {game['released']}\n\n"
-        f"{game['description_raw'][:700]}..."
+        f"{translated_description[:700]}..."
     )
 
     image = game.get("background_image")
