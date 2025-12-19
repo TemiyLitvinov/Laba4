@@ -6,6 +6,9 @@ from aiogram.filters import Command
 from googletrans import Translator
 from states import RequirementsSearch
 from keyboard import main_keyboard
+from exceptions import InvalidGameNameError, GameNotFoundError, ApiRequestError
+from api import get_game_requirements
+
 
 
 from config import BOT_TOKEN
@@ -45,32 +48,46 @@ async def game_command(message: types.Message, state: FSMContext):
 
 @dp.message(GameSearch.waiting_for_name)
 async def process_game_name(message: types.Message, state: FSMContext):
-    name = message.text
-    game = search_game(name)
-    description = game['description_raw']
-    translated_description = translator.translate(description, dest="ru").text
+    try:
+        name = message.text.strip()
 
-    if not game:
-        await message.answer("Игра не найдена :(")
+        if name.isdigit():
+            raise InvalidGameNameError("Название игры не может состоять только из чисел")
+
+        if len(name) < 2:
+            raise InvalidGameNameError("Название игры слишком короткое")
+
+        game = search_game(name)
+
+        description = game.get("description_raw", "Описание отсутствует")
+        translated_description = translator.translate(description, dest="ru").text
+
+        text = (
+            f"🎮 {game['name']}\n"
+            f"⭐ Рейтинг: {game['rating']}\n"
+            f"📅 Дата выхода: {game['released']}\n\n"
+            f"{translated_description[:700]}..."
+        )
+
+        image = game.get("background_image")
+
+        if image:
+            await message.answer_photo(image, caption=text)
+        else:
+            await message.answer(text)
+
+    except InvalidGameNameError as e:
+        await message.answer(f"{e}")
+
+    except GameNotFoundError:
+        await message.answer("Игра не найдена. Попробуйте другое название.")
+
+    except ApiRequestError:
+        await message.answer("Ошибка сервера. Попробуйте позже.")
+
+    finally:
         await state.clear()
-        return
 
-
-    text = (
-        f"🎮 {game['name']}\n"
-        f"⭐ Рейтинг: {game['rating']}\n"
-        f"📅 Дата выхода: {game['released']}\n\n"
-        f"{translated_description[:700]}..."
-    )
-
-    image = game.get("background_image")
-
-    if image:
-        await message.answer_photo(image, caption=text)
-    else:
-        await message.answer(text)
-
-    await state.clear()
 
 @dp.message(Command("top"))
 async def top_games(message: types.Message):
@@ -91,34 +108,33 @@ async def requirements_command(message: types.Message, state: FSMContext):
 
 @dp.message(RequirementsSearch.waiting_for_name)
 async def process_requirements(message: types.Message, state: FSMContext):
-    name = message.text
-    game = search_game(name)
+    try:
+        name = message.text.strip()
 
-    if not game:
-        await message.answer("Игра не найдена :(")
+        if name.isdigit():
+            raise InvalidGameNameError("Название игры не может быть числом")
+
+        reqs = get_game_requirements(name)
+
+        requirements_text = (
+            f"{reqs['minimum']}\n\n"
+            f"{reqs['recommended']}"
+        )
+
+        translated = translator.translate(requirements_text, dest="ru").text
+        await message.answer(translated)
+
+    except InvalidGameNameError as e:
+        await message.answer(f"{e}")
+
+    except GameNotFoundError:
+        await message.answer("Игра не найдена. Попробуйте другое название.")
+
+    except ApiRequestError:
+        await message.answer("Ошибка соединения с сервером RAWG. Попробуйте позже.")
+
+    finally:
         await state.clear()
-        return
-
-    requirements_text = "💻 Системные требования:\n\n"
-    found = False
-
-    for platform in game.get("platforms", []):
-        if platform["platform"]["name"] == "PC":
-            reqs = platform.get("requirements", {})
-            requirements_text += (
-                f"{reqs.get('minimum', 'Нет данных минимальных требований')}\n\n"
-                f"{reqs.get('recommended', 'Нет данных рекомендуемых требований')}"
-            )
-            found = True
-            break
-
-    if not found:
-        requirements_text = "Системные требования не найдены :("
-
-    translated_requirements = translator.translate(requirements_text, dest="ru").text
-
-    await message.answer(translated_requirements)
-    await state.clear()
 
 
 async def main():

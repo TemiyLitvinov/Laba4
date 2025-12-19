@@ -3,7 +3,12 @@ import asyncio
 
 
 async def main():
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await bot.session.close()
 
 
 if __name__ == '__main__':
