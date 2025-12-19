@@ -4,6 +4,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from googletrans import Translator
+from states import RequirementsSearch
+from keyboard import main_keyboard
 
 
 from config import BOT_TOKEN
@@ -18,10 +20,22 @@ translator = Translator()
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer(
-        "Game_directory_bot\n\n"
-        "/game <название> — информация об игре\n"
-        "/top — топ 10 игр"
+        "🎮 Game_directory_bot\n"
+        "Бот для получения информации о компьютерных играх.\n\n"
+        "Используйте кнопки ниже ⬇️",
+        reply_markup=main_keyboard()
     )
+
+
+@dp.message(Command("help"))
+async def help_command(message: types.Message):
+    await message.answer(
+        "📖 Доступные команды:\n\n"
+        "/game — поиск информации об игре\n"
+        "/top — топ 10 игр\n"
+        "/requirements - просмотр системных требований к игре\n"
+    )
+
 
 @dp.message(Command("game"))
 async def game_command(message: types.Message, state: FSMContext):
@@ -40,6 +54,7 @@ async def process_game_name(message: types.Message, state: FSMContext):
         await message.answer("Игра не найдена :(")
         await state.clear()
         return
+
 
     text = (
         f"🎮 {game['name']}\n"
@@ -66,6 +81,45 @@ async def top_games(message: types.Message):
         text += f"{i}. {game['name']} — {game['rating']}\n"
 
     await message.answer(text)
+
+
+@dp.message(Command("requirements"))
+async def requirements_command(message: types.Message, state: FSMContext):
+    await message.answer("Введите название игры для просмотра системных требований 💻")
+    await state.set_state(RequirementsSearch.waiting_for_name)
+
+
+@dp.message(RequirementsSearch.waiting_for_name)
+async def process_requirements(message: types.Message, state: FSMContext):
+    name = message.text
+    game = search_game(name)
+
+    if not game:
+        await message.answer("Игра не найдена :(")
+        await state.clear()
+        return
+
+    requirements_text = "💻 Системные требования:\n\n"
+    found = False
+
+    for platform in game.get("platforms", []):
+        if platform["platform"]["name"] == "PC":
+            reqs = platform.get("requirements", {})
+            requirements_text += (
+                f"{reqs.get('minimum', 'Нет данных минимальных требований')}\n\n"
+                f"{reqs.get('recommended', 'Нет данных рекомендуемых требований')}"
+            )
+            found = True
+            break
+
+    if not found:
+        requirements_text = "Системные требования не найдены :("
+
+    translated_requirements = translator.translate(requirements_text, dest="ru").text
+
+    await message.answer(translated_requirements)
+    await state.clear()
+
 
 
 async def main():
