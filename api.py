@@ -15,11 +15,11 @@ def search_game(name):
     data = response.json()
     return data["results"][0] if data else None
 
-def get_top_names():
+def get_top_games():
     url = f"{BASE_URL}/games"
     params = {
         "ordering" : "-rating",
-        "page_size" : 5,
+        "page_size" : 10,
         "key" : RAWG_API_KEY
     }
     response = requests.get(url, params=params)
